@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { authenticateToken } = require('../middleware/auth');
 
 // Get all clubs
 router.get('/', async (req, res) => {
@@ -35,10 +36,15 @@ router.get('/:id', async (req, res) => {
 });
 
 // Join club
-router.post('/:id/join', async (req, res) => {
+router.post('/:id/join', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { student_id } = req.body; // Assume from auth middleware
+  const student_id = req.user.id;
   try {
+    // Check if already member
+    const existing = await db.query('SELECT * FROM memberships WHERE student_id = $1 AND club_id = $2', [student_id, id]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Already a member of this club' });
+    }
     await db.query('INSERT INTO memberships (student_id, club_id) VALUES ($1, $2)', [student_id, id]);
     res.json({ message: 'Joined club successfully' });
   } catch (err) {

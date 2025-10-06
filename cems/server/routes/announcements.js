@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { authenticateToken } = require('../middleware/auth');
 
 // Get all announcements
 router.get('/', async (req, res) => {
@@ -26,9 +27,15 @@ router.get('/club/:clubId', async (req, res) => {
 });
 
 // Create announcement
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   const { club_id, title, content } = req.body;
+  const user_id = req.user.id;
   try {
+    // Check if user is a club head or member
+    const clubHead = await db.query('SELECT * FROM club_users WHERE student_id = $1 AND club_id = $2', [user_id, club_id]);
+    if (clubHead.rows.length === 0) {
+      return res.status(403).json({ message: 'Not authorized to create announcements for this club' });
+    }
     const result = await db.query(
       'INSERT INTO announcements (club_id, title, content) VALUES ($1, $2, $3) RETURNING *',
       [club_id, title, content]
